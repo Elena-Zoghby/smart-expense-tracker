@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/backend": "^2.33.0",
+    "@clerk/nextjs": "^6.39.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",

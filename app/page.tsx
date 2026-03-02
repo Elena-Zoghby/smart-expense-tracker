@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import categoryKeywords from "@/data/categoryKeywords.json";
-
+import { UserButton, useUser,useAuth} from "@clerk/nextjs";
 type Expense = {
   id: string;
   title: string;
@@ -17,6 +17,8 @@ const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AA00FF", "#FF3366"
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export default function Home() {
+  const { user } = useUser();
+  const { getToken } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
@@ -106,34 +108,44 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const fetchExpenses = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/expenses`);
-        if (!res.ok) throw new Error("Failed to fetch expenses");
-        const data = await res.json();
-        setExpenses(data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchExpenses();
-  }, []);
+  if (!user) return;
+  const fetchExpenses = async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${BASE_URL}/expenses`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch expenses");
+      const data = await res.json();
+      setExpenses(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  fetchExpenses();
+}, [user]);
+
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/api/expenses/stats`);
-        if (!res.ok) throw new Error("Failed to fetch stats");
-        const data = await res.json();
-        setBudget(data.budget || 0);
-        setRemainingBudget(data.remainingBudget || 0);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchStats();
-  }, [expenses]);
-
+  if (!user) return;
+  const fetchStats = async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${BASE_URL}/api/expenses/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      const data = await res.json();
+      setBudget(data.budget || 0);
+      setRemainingBudget(data.remainingBudget || 0);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  fetchStats();
+}, [expenses, user]);
   const chartData = categories
     .map((cat) => ({
       name: cat,
@@ -178,62 +190,55 @@ export default function Home() {
   }, [editing]);
 
   const handleAddExpense = async () => {
-    if (!title || !amount || !date) return alert("Fill all required fields");
-    if (Number(amount) <= 0) return alert("Amount must be positive");
-
-    setIsSubmitting(true);
-    try {
-      if (editing) {
-        const res = await fetch(`${BASE_URL}/expenses/${editing.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title,
-            amount: Number(amount),
-            date,
-            description,
-            category,
-          }),
-        });
-        if (!res.ok) throw new Error("Failed to update expense");
-        const updated = await res.json();
-        setExpenses((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-        setEditing(null);
-      } else {
-        const res = await fetch(`${BASE_URL}/expenses`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, amount: Number(amount), date, description, category }),
-        });
-        if (!res.ok) throw new Error("Failed to add expense");
-        const newExp = await res.json();
-        setExpenses((prev) => [...prev, newExp]);
-      }
-
-      setTitle("");
-      setAmount("");
-      setDate("");
-      setDescription("");
-      setCategory("Food");
-      setManualCategory(false);
-    } catch (err) {
-      console.error(err);
-      alert("Error saving expense");
-    } finally {
-      setIsSubmitting(false);
+  if (!title || !amount || !date) return alert("Fill all required fields");
+  if (Number(amount) <= 0) return alert("Amount must be positive");
+  setIsSubmitting(true);
+  try {
+    const token = await getToken();
+    if (editing) {
+      const res = await fetch(`${BASE_URL}/expenses/${editing.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title, amount: Number(amount), date, description, category }),
+      });
+      if (!res.ok) throw new Error("Failed to update expense");
+      const updated = await res.json();
+      setExpenses((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+      setEditing(null);
+    } else {
+      const res = await fetch(`${BASE_URL}/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title, amount: Number(amount), date, description, category }),
+      });
+      if (!res.ok) throw new Error("Failed to add expense");
+      const newExp = await res.json();
+      setExpenses((prev) => [...prev, newExp]);
     }
-  };
+    setTitle(""); setAmount(""); setDate(""); setDescription(""); setCategory("Food");
+    setManualCategory(false);
+  } catch (err) {
+    console.error(err);
+    alert("Error saving expense");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleDelete = async (id: string) => {
-    try {
-      const res = await fetch(`${BASE_URL}/expenses/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
-      setExpenses((prev) => prev.filter((e) => e.id !== id));
-    } catch (err) {
-      console.error(err);
-      alert("Error deleting expense");
-    }
-  };
+  try {
+    const token = await getToken();
+    const res = await fetch(`${BASE_URL}/expenses/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error("Failed to delete");
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+  } catch (err) {
+    console.error(err);
+    alert("Error deleting expense");
+  }
+};
   let budgetAlert = "";
   let alertColor = "";
 
@@ -249,33 +254,29 @@ export default function Home() {
   }
 
   const handleBudget = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!budgetInput || Number(budgetInput) <= 0) return alert("Enter a valid budget");
-
-    try {
-      const method = budget === 0 || budget === null ? "POST" : "PUT";
-
-      const res = await fetch(`${BASE_URL}/api/budget`, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: Number(budgetInput) }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || "Failed to save budget");
-      }
-
-      const data = await res.json();
-      setBudget(data.amount);
-      setRemainingBudget(data.amount - totalExpenses);
-      setBudgetInput("");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to save budget");
+  e.preventDefault();
+  if (!budgetInput || Number(budgetInput) <= 0) return alert("Enter a valid budget");
+  try {
+    const token = await getToken();
+    const method = budget === 0 || budget === null ? "POST" : "PUT";
+    const res = await fetch(`${BASE_URL}/api/budget`, {
+      method,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ amount: Number(budgetInput) }),
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.message || "Failed to save budget");
     }
-
-  };
+    const data = await res.json();
+    setBudget(data.amount);
+    setRemainingBudget(data.amount - totalExpenses);
+    setBudgetInput("");
+  } catch (err) {
+    console.error(err);
+    alert("Failed to save budget");
+  }
+};
 
   const filteredExpenses = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -358,19 +359,18 @@ const getSuggestion = () => {
 //export to pdf
 const handleExportPdf = async () => {
   try {
-    const res = await fetch(`${BASE_URL}/api/expenses/export-pdf`);
-    
+    const token = await getToken();
+    const res = await fetch(`${BASE_URL}/api/expenses/export-pdf`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
     if (!res.ok) throw new Error("Backend failed to produce PDF");
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
-    
     const a = document.createElement("a");
     a.href = url;
     a.download = `Expenses_${new Date().toISOString().split('T')[0]}.pdf`;
     document.body.appendChild(a);
     a.click();
-    
-    //remove to save memory
     a.remove();
     window.URL.revokeObjectURL(url);
   } catch (err) {
@@ -379,11 +379,14 @@ const handleExportPdf = async () => {
   }
 };
   return (
-    <div
+   <div
       className={`min-h-screen transition-colors duration-300 ${darkMode ? "bg-slate-950 text-slate-100" : "bg-gray-50 text-gray-900"
         }`}
     >
-      <div className="fixed top-4 right-4 z-10">
+      <div className="fixed top-4 right-4 z-10 flex items-center gap-3"> {/* ✅ added flex items-center gap-3 */}
+        
+        
+        <UserButton afterSignOutUrl="/sign-in" />
         <button
           onClick={toggleDarkMode}
           className={`p-3 rounded-lg shadow-lg border transition-all duration-300 ${darkMode
@@ -400,7 +403,11 @@ const handleExportPdf = async () => {
         <h1 className="text-3xl font-bold text-center mb-8">
           Smart Expense Tracker
         </h1>
-
+          {user && (
+          <p className={`text-center mb-6 text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+            Welcome back, {user.firstName || user.emailAddresses[0].emailAddress} 👋
+          </p>
+        )}
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="lg:w-1/3">
             <div
