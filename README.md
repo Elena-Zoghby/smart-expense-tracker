@@ -16,7 +16,7 @@ Many people track expenses manually or not at all, making it hard to understand 
 # Tech Stack
 - Frontend: Next.js (React)
 - Backend: Node.js (API routes / Express)
-- Database: MongoDB (or PostgreSQL)
+- Database: MongoDB
 - Tools: GitHub, Postman, Notion, VS Code
 
 ## Features
@@ -28,7 +28,7 @@ Many people track expenses manually or not at all, making it hard to understand 
 To run this project on your machine:
 
 1. **Clone the Repo:**
-   `git clone (https://github.com/Elena-Zoghby/techtalks-smart-expense-tracker)`
+   `git clone (https://github.com/Elena-Zoghby/smart-expense-tracker)`
 
 2. **Install Dependencies:**
    Run `npm install` in the root and `/backend` folders.
